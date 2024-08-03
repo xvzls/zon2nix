@@ -1,76 +1,132 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
-const Ast = std.zig.Ast;
-const File = std.fs.File;
-const Index = std.zig.Ast.Node.Index;
-const StringHashMap = std.StringHashMap;
-const mem = std.mem;
-const string_literal = std.zig.string_literal;
 
+const Ast = std.zig.Ast;
 const Dependency = @import("Dependency.zig");
 
-pub fn parse(alloc: Allocator, deps: *StringHashMap(Dependency), file: File) !void {
-	const content = try alloc.allocSentinel(u8, try file.getEndPos(), 0);
-	_ = try file.reader().readAll(content);
-	
-	const ast = try Ast.parse(alloc, content, .zon);
-	
-	var buf: [2]Index = undefined;
-	const root_init = ast.fullStructInit(&buf, ast.nodes.items(.data)[0].lhs) orelse {
-		return error.ParseError;
-	};
-	
-	for (root_init.ast.fields) |field_idx| {
-		if (!mem.eql(u8, try parseFieldName(alloc, ast, field_idx), "dependencies")) {
-			continue;
-		}
+fn parseString(
+	allocator: std.mem.Allocator,
+	tree: Ast,
+	idx: Ast.Node.Index,
+) ![]u8 {
+	return std.zig.string_literal.parseAlloc(
+		allocator,
+		tree.tokenSlice(
+			tree.nodes.items(.main_token)[idx]
+		),
+	);
+}
+
+fn parseFieldName(
+	allocator: std.mem.Allocator,
+	tree: Ast,
+	idx: Ast.Node.Index,
+) ![]u8 {
+	const name = tree.tokenSlice(
+		tree.firstToken(idx) - 2
+	);
+	return if (name[0] == '@')
+		std.zig.string_literal.parseAlloc(
+			allocator,
+			name[1 .. ]
+		)
+	else
+		allocator.dupe(u8, name);
+}
+
+fn getFieldIndex(
+	allocator: std.mem.Allocator,
+	tree: Ast,
+	init: Ast.full.StructInit,
+	name: []const u8,
+) !?Ast.Node.Index {
+	for (init.ast.fields) |idx| {
+		const field_name = try parseFieldName(
+			allocator,
+			tree,
+			idx,
+		);
+		defer allocator.free(field_name);
 		
-		const deps_init = ast.fullStructInit(&buf, field_idx) orelse {
-			return error.ParseError;
-		};
-		
-		for (deps_init.ast.fields) |dep_idx| {
-			var dep: Dependency = .{
-				.url = undefined,
-				.nix_hash = undefined,
-				.done = false,
-			};
-			var hash: []const u8 = undefined;
-			var has_url = false;
-			var has_hash = false;
-			
-			const dep_init = ast.fullStructInit(&buf, dep_idx) orelse {
-				return error.parseError;
-			};
-			
-			for (dep_init.ast.fields) |dep_field_idx| {
-				const name = try parseFieldName(alloc, ast, dep_field_idx);
-				
-				if (mem.eql(u8, name, "url")) {
-					dep.url = try parseString(alloc, ast, dep_field_idx);
-					has_url = true;
-				} else if (mem.eql(u8, name, "hash")) {
-					hash = try parseString(alloc, ast, dep_field_idx);
-					has_hash = true;
-				}
-			}
-			
-			if (has_url and has_hash) {
-				_ = try deps.getOrPutValue(hash, dep);
-			} else {
-				return error.parseError;
-			}
+		if (std.mem.eql(u8, name, field_name)) {
+			return idx;
 		}
 	}
+	
+	return null;
 }
 
-fn parseFieldName(alloc: Allocator, ast: Ast, idx: Index) ![]const u8 {
-	const name = ast.tokenSlice(ast.firstToken(idx) - 2);
-	return if (name[0] == '@') string_literal.parseAlloc(alloc, name[1..]) else name;
-}
-
-fn parseString(alloc: Allocator, ast: Ast, idx: Index) ![]const u8 {
-	return string_literal.parseAlloc(alloc, ast.tokenSlice(ast.nodes.items(.main_token)[idx]));
+pub fn parse(
+	allocator: std.mem.Allocator,
+	deps: *std.StringHashMap(Dependency),
+	file: std.fs.File,
+) !void {
+	const content = try allocator.allocSentinel(
+		u8,
+		try file.getEndPos(),
+		0,
+	);
+	_ = try file.reader().readAll(content);
+	
+	var tree = try Ast.parse(allocator, content, .zon);
+	defer tree.deinit(allocator);
+	
+	var buffer: [2]Ast.Node.Index = undefined;
+	const root_init = tree.fullStructInit(
+		&buffer,
+		tree.nodes.items(.data)[0].lhs
+	) orelse return error.ParseError;
+	
+	const dependencies_idx = try getFieldIndex(
+		allocator,
+		tree,
+		root_init,
+		"dependencies",
+	) orelse return;
+	
+	const dependencies_init = tree.fullStructInit(
+		&buffer,
+		dependencies_idx,
+	) orelse return error.ParseError;
+	
+	for (dependencies_init.ast.fields) |dependency_idx| {
+		const dependency_init = tree.fullStructInit(
+			&buffer,
+			dependency_idx,
+		) orelse return error.ParseError;
+		
+		const hash = if (try getFieldIndex(
+			allocator,
+			tree,
+			dependency_init,
+			"hash",
+		)) |idx| try parseString(
+			allocator,
+			tree,
+			idx,
+		) else null;
+		
+		const url = if (try getFieldIndex(
+			allocator,
+			tree,
+			dependency_init,
+			"url",
+		)) |idx| try parseString(
+			allocator,
+			tree,
+			idx,
+		) else null;
+		
+		if (hash != null and url != null) {
+			_ = try deps.getOrPutValue(
+				hash.?,
+				.{
+					.url = url.?,
+					.nix_hash = undefined,
+					.done = false,
+				},
+			);
+		} else return error.ParseError;
+	}
 }
 
 test parse {
@@ -82,7 +138,7 @@ test parse {
 	defer arena.deinit();
 	const alloc = arena.allocator();
 
-	var deps = StringHashMap(Dependency).init(alloc);
+	var deps = std.StringHashMap(Dependency).init(alloc);
 	const basic = try fs.cwd().openFile("fixtures/basic.zon", .{});
 	try parse(alloc, &deps, basic);
 	basic.close();
