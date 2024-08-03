@@ -1,13 +1,4 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
-const ChildProcess = std.process.Child;
-const StringHashMap = std.StringHashMap;
-const fmt = std.fmt;
-const fs = std.fs;
-const json = std.json;
-const log = std.log;
-
 const nix = @import("options").nix;
 
 const Dependency = @import("Dependency.zig");
@@ -19,12 +10,18 @@ const Prefetch = struct {
 };
 
 const Worker = struct {
-	child: *ChildProcess,
+	child: *std.process.Child,
 	dep: *Dependency,
 };
 
-pub fn fetch(alloc: Allocator, deps: *StringHashMap(Dependency)) !void {
-	var workers = try ArrayList(Worker).initCapacity(alloc, deps.count());
+pub fn fetch(
+	allocator: std.mem.Allocator,
+	deps: *std.StringHashMap(Dependency),
+) !void {
+	var workers = try std.ArrayList(Worker).initCapacity(
+		allocator,
+		deps.count(),
+	);
 	var done = false;
 	
 	while (!done) {
@@ -34,14 +31,35 @@ pub fn fetch(alloc: Allocator, deps: *StringHashMap(Dependency)) !void {
 				continue;
 			}
 			
-			var child = try alloc.create(ChildProcess);
-			const ref = try fmt.allocPrint(alloc, "tarball+{s}", .{dep.url});
-			const argv = &[_][]const u8{ nix, "flake", "prefetch", "--json", "--extra-experimental-features", "flakes nix-command", ref };
-			child.* = ChildProcess.init(argv, alloc);
+			var child = try allocator.create(
+				std.process.Child
+			);
+			const ref = try std.fmt.allocPrint(
+				allocator,
+				"tarball+{s}",
+				.{ dep.url },
+			);
+			const argv = &[_][]const u8{
+				nix,
+				"flake",
+				"prefetch",
+				"--json",
+				"--extra-experimental-features",
+				"flakes nix-command",
+				ref,
+			};
+			child.* = std.process.Child.init(
+				argv,
+				allocator,
+			);
 			child.stdin_behavior = .Ignore;
 			child.stdout_behavior = .Pipe;
+			
 			try child.spawn();
-			try workers.append(.{ .child = child, .dep = dep });
+			try workers.append(.{
+				.child = child,
+				.dep = dep,
+			});
 		}
 		
 		const len_before = deps.count();
@@ -51,35 +69,78 @@ pub fn fetch(alloc: Allocator, deps: *StringHashMap(Dependency)) !void {
 			const child = worker.child;
 			const dep = worker.dep;
 			
-			var reader = json.reader(alloc, child.stdout.?.reader());
-			const res = try json.parseFromTokenSourceLeaky(Prefetch, alloc, &reader, .{ .ignore_unknown_fields = true });
+			defer allocator.destroy(child);
+			
+			var reader = std.json.reader(
+				allocator,
+				child.stdout.?.reader(),
+			);
+			defer reader.deinit();
+			
+			var res = try std.json.parseFromTokenSource(
+				Prefetch,
+				allocator,
+				&reader,
+				.{ .ignore_unknown_fields = true },
+			);
+			defer res.deinit();
 			
 			switch (try child.wait()) {
 				.Exited => |code| if (code != 0) {
-					log.err("{s} exited with code {}", .{ child.argv, code });
+					std.log.err(
+						"{s} exited with code {}",
+						.{
+							child.argv,
+							code,
+						},
+					);
 					return error.NixError;
 				},
 				.Signal => |signal| {
-					log.err("{s} terminated with signal {}", .{ child.argv, signal });
+					std.log.err(
+						"{s} terminated with signal {}",
+						.{
+							child.argv,
+							signal,
+						},
+					);
 					return error.NixError;
 				},
 				.Stopped, .Unknown => {
-					log.err("{s} finished unsuccessfully", .{child.argv});
+					std.log.err(
+						"{s} finished unsuccessfully",
+						.{
+							child.argv,
+						},
+					);
 					return error.NixError;
 				},
 			}
 			
-			dep.nix_hash = res.hash;
+			dep.nix_hash = try allocator.dupe(
+				u8,
+				res.value.hash,
+			);
 			dep.done = true;
+			const path = try std.fs.path.join(
+				allocator,
+				&[_][]const u8{
+					res.value.storePath,
+					"build.zig.zon",
+				},
+			);
+			defer allocator.free(path);
 			
-			const path = try fmt.allocPrint(alloc, "{s}" ++ fs.path.sep_str ++ "build.zig.zon", .{res.storePath});
-			const file = fs.openFileAbsolute(path, .{}) catch |err| switch (err) {
+			const file = std.fs.openFileAbsolute(
+				path,
+				.{},
+			) catch |err| switch (err) {
 				error.FileNotFound => continue,
 				else => return err,
 			};
 			defer file.close();
 			
-			try parse(alloc, deps, file);
+			try parse(allocator, deps, file);
 			if (deps.count() > len_before) {
 				done = false;
 			}
