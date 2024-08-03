@@ -1,40 +1,61 @@
 const std = @import("std");
-const StringHashMap = std.StringHashMap;
-const fs = std.fs;
-const heap = std.heap;
-const io = std.io;
-const process = std.process;
 
 const Dependency = @import("Dependency.zig");
 const fetch = @import("fetch.zig").fetch;
 const parse = @import("parse.zig").parse;
 const write = @import("codegen.zig").write;
 
+fn getFile(
+	dir: std.fs.Dir,
+	path: ?[]const u8,
+) !std.fs.File {
+	if (path) |p| {
+		const stat = try dir.statFile(p);
+		if (stat.kind != .directory) {
+			return dir.openFile(p, .{});
+		}
+		var sub_dir = try dir.openDir(p, .{});
+		defer sub_dir.close();
+		return sub_dir.openFile("build.zig.zon", .{});
+	} else {
+		return dir.openFile("build.zig.zon", .{});
+	}
+}
+
 pub fn main() !void {
-	var args = process.args();
+	var args = std.process.args();
 	_ = args.skip();
-	const dir = fs.cwd();
+	const dir = std.fs.cwd();
 	
-	const file = try if (args.next()) |path|
-		if ((try dir.statFile(path)).kind == .directory)
-			(try dir.openDir(path, .{})).openFile("build.zig.zon", .{})
-		else
-			dir.openFile(path, .{})
-	else
-		dir.openFile("build.zig.zon", .{});
+	const file = try getFile(dir, args.next());
 	defer file.close();
 	
-	var arena = heap.ArenaAllocator.init(heap.raw_c_allocator);
+	var arena = std.heap.ArenaAllocator.init(
+		std.heap.page_allocator,
+	);
 	defer arena.deinit();
-	const alloc = arena.allocator();
+	const allocator = arena.allocator();
 	
-	var deps = StringHashMap(Dependency).init(alloc);
-	try parse(alloc, &deps, file);
-	try fetch(alloc, &deps);
+	var deps = std.StringHashMap(Dependency).init(
+		allocator
+	);
+	defer {
+		var iter = deps.iterator();
+		while (iter.next()) |entry| {
+			allocator.free(entry.key_ptr.*);
+			allocator.destroy(entry.value_ptr);
+		}
+		deps.deinit();
+	}
 	
-	var out = io.bufferedWriter(io.getStdOut().writer());
-	try write(alloc, deps, out.writer());
-	try out.flush();
+	try parse(allocator, &deps, file);
+	try fetch(allocator, &deps);
+	
+	const out = std.io.getStdOut().writer();
+	
+	var buffered_out = std.io.bufferedWriter(out);
+	try write(allocator, deps, buffered_out.writer());
+	try buffered_out.flush();
 }
 
 comptime {
