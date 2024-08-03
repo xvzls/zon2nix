@@ -66,6 +66,7 @@ pub fn parse(
 		0,
 	);
 	_ = try file.reader().readAll(content);
+	defer allocator.free(content);
 	
 	var tree = try Ast.parse(allocator, content, .zon);
 	defer tree.deinit(allocator);
