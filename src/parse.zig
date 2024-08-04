@@ -122,7 +122,7 @@ pub fn parse(
 				hash.?,
 				.{
 					.url = url.?,
-					.nix_hash = undefined,
+					.nix_hash = null,
 					.done = false,
 				},
 			);

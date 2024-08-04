@@ -22,6 +22,7 @@ pub fn fetch(
 		allocator,
 		deps.count(),
 	);
+	defer workers.deinit();
 	var done = false;
 	
 	while (!done) {
@@ -39,6 +40,8 @@ pub fn fetch(
 				"tarball+{s}",
 				.{ dep.url },
 			);
+			defer allocator.free(ref);
+			
 			const argv = &[_][]const u8{
 				nix,
 				"flake",
@@ -52,6 +55,7 @@ pub fn fetch(
 				argv,
 				allocator,
 			);
+			
 			child.stdin_behavior = .Ignore;
 			child.stdout_behavior = .Pipe;
 			

@@ -30,11 +30,10 @@ pub fn main() !void {
 	const file = try getFile(dir, args.next());
 	defer file.close();
 	
-	var arena = std.heap.ArenaAllocator.init(
-		std.heap.page_allocator,
-	);
-	defer arena.deinit();
-	const allocator = arena.allocator();
+	var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+	defer _ = gpa.deinit();
+	
+	const allocator = gpa.allocator();
 	
 	var deps = std.StringHashMap(Dependency).init(
 		allocator
@@ -43,8 +42,9 @@ pub fn main() !void {
 		var iter = deps.iterator();
 		while (iter.next()) |entry| {
 			allocator.free(entry.key_ptr.*);
-			allocator.destroy(entry.value_ptr);
+			entry.value_ptr.deinit(allocator);
 		}
+		deps.clearAndFree();
 		deps.deinit();
 	}
 	
@@ -54,7 +54,7 @@ pub fn main() !void {
 	const out = std.io.getStdOut().writer();
 	
 	var buffered_out = std.io.bufferedWriter(out);
-	try write(allocator, deps, buffered_out.writer());
+	try write(allocator, &deps, buffered_out.writer());
 	try buffered_out.flush();
 }
 

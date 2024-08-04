@@ -13,7 +13,7 @@ fn lessThan(_: void, lhs: Entry, rhs: Entry) bool {
 
 pub fn write(
 	allocator: std.mem.Allocator,
-	deps: std.StringHashMap(Dependency),
+	deps: *const std.StringHashMap(Dependency),
 	out: anytype,
 ) !void {
 	try out.writeAll(
@@ -27,6 +27,8 @@ pub fn write(
 	
 	const len = deps.count();
 	var entries = try allocator.alloc(Entry, len);
+	defer allocator.free(entries);
+	
 	var iter = deps.iterator();
 	for (0..len) |i| {
 		entries[i] = iter.next().?;
@@ -48,7 +50,7 @@ pub fn write(
 		, .{
 			.name = key,
 			.url = dep.url,
-			.hash = dep.nix_hash,
+			.hash = dep.nix_hash.?,
 		});
 	}
 	
