@@ -1,8 +1,6 @@
+const root = @import("root");
 const std = @import("std");
 const nix = @import("options").nix;
-
-const Dependency = @import("Dependency.zig");
-const parse = @import("parse.zig").parse;
 
 const Prefetch = struct {
 	hash: []const u8,
@@ -11,12 +9,12 @@ const Prefetch = struct {
 
 const Worker = struct {
 	child: *std.process.Child,
-	dep: *Dependency,
+	dep: *root.Dependency,
 };
 
 pub fn fetch(
 	allocator: std.mem.Allocator,
-	deps: *std.StringHashMap(Dependency),
+	deps: *std.StringHashMap(root.Dependency),
 ) !void {
 	var workers = try std.ArrayList(Worker).initCapacity(
 		allocator,
@@ -144,7 +142,7 @@ pub fn fetch(
 			};
 			defer file.close();
 			
-			try parse(allocator, deps, file);
+			try root.parse(allocator, deps, file);
 			if (deps.count() > len_before) {
 				done = false;
 			}

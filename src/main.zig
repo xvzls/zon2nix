@@ -1,9 +1,11 @@
 const std = @import("std");
 
-const Dependency = @import("Dependency.zig");
-const fetch = @import("fetch.zig").fetch;
-const parse = @import("parse.zig").parse;
-const write = @import("codegen.zig").write;
+pub const dependency = @import("dependency.zig");
+pub const fetch = @import("fetch.zig").fetch;
+pub const parse = @import("parse.zig").parse;
+pub const write = @import("codegen.zig").write;
+
+pub const Dependency = dependency.Dependency;
 
 fn getFile(
 	dir: std.fs.Dir,

@@ -1,7 +1,7 @@
+const root = @import("root");
 const std = @import("std");
 
 const Ast = std.zig.Ast;
-const Dependency = @import("Dependency.zig");
 
 fn parseString(
 	allocator: std.mem.Allocator,
@@ -57,7 +57,7 @@ fn getFieldIndex(
 
 pub fn parse(
 	allocator: std.mem.Allocator,
-	deps: *std.StringHashMap(Dependency),
+	deps: *std.StringHashMap(root.Dependency),
 	file: std.fs.File,
 ) !void {
 	const content = try allocator.allocSentinel(
@@ -139,7 +139,9 @@ test parse {
 	defer arena.deinit();
 	const alloc = arena.allocator();
 
-	var deps = std.StringHashMap(Dependency).init(alloc);
+	var deps = std.StringHashMap(
+		root.Dependency
+	).init(alloc);
 	const basic = try fs.cwd().openFile("fixtures/basic.zon", .{});
 	try parse(alloc, &deps, basic);
 	basic.close();

@@ -1,7 +1,7 @@
+const root = @import("root");
 const std = @import("std");
 
-const Dependency = @import("Dependency.zig");
-const Entry = std.StringHashMap(Dependency).Entry;
+const Entry = std.StringHashMap(root.Dependency).Entry;
 
 fn lessThan(_: void, lhs: Entry, rhs: Entry) bool {
 	return std.mem.order(
@@ -13,7 +13,7 @@ fn lessThan(_: void, lhs: Entry, rhs: Entry) bool {
 
 pub fn write(
 	allocator: std.mem.Allocator,
-	deps: *const std.StringHashMap(Dependency),
+	deps: *const std.StringHashMap(root.Dependency),
 	out: anytype,
 ) !void {
 	try out.writeAll(
