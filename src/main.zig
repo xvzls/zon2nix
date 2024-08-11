@@ -9,19 +9,21 @@ pub const Dependency = dependency.Dependency;
 
 fn getFile(
 	dir: std.fs.Dir,
-	path: ?[]const u8,
+	maybe_path: ?[]const u8,
 ) !std.fs.File {
-	if (path) |p| {
-		const stat = try dir.statFile(p);
-		if (stat.kind != .directory) {
-			return dir.openFile(p, .{});
-		}
-		var sub_dir = try dir.openDir(p, .{});
-		defer sub_dir.close();
-		return sub_dir.openFile("build.zig.zon", .{});
-	} else {
+	const path = maybe_path orelse {
 		return dir.openFile("build.zig.zon", .{});
+	};
+	
+	const stat = try dir.statFile(path);
+	if (stat.kind != .directory) {
+		return dir.openFile(path, .{});
 	}
+	
+	var sub_dir = try dir.openDir(path, .{});
+	defer sub_dir.close();
+	
+	return sub_dir.openFile("build.zig.zon", .{});
 }
 
 pub fn main() !void {
