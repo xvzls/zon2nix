@@ -58,16 +58,8 @@ fn getFieldIndex(
 pub fn parse(
 	allocator: std.mem.Allocator,
 	deps: *std.StringHashMap(root.Dependency),
-	file: std.fs.File,
+	content: [:0]const u8,
 ) !void {
-	const content = try allocator.allocSentinel(
-		u8,
-		try file.getEndPos(),
-		0,
-	);
-	_ = try file.reader().readAll(content);
-	defer allocator.free(content);
-	
 	var tree = try Ast.parse(allocator, content, .zon);
 	defer tree.deinit(allocator);
 	

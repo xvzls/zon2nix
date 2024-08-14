@@ -7,6 +7,19 @@ pub const write = @import("codegen.zig").write;
 
 pub const Dependency = dependency.Dependency;
 
+pub fn readAllocSentinel(
+	file: std.fs.File,
+	allocator: std.mem.Allocator,
+) ![:0]u8 {
+	const content = try allocator.allocSentinel(
+		u8,
+		try file.getEndPos(),
+		0,
+	);
+	_ = try file.reader().readAll(content);
+	return content;
+}
+
 fn getFile(
 	dir: std.fs.Dir,
 	maybe_path: ?[]const u8,
@@ -39,6 +52,12 @@ pub fn main() !void {
 	
 	const allocator = gpa.allocator();
 	
+	const content = try readAllocSentinel(
+		file,
+		allocator,
+	);
+	defer allocator.free(content);
+	
 	var deps = std.StringHashMap(Dependency).init(
 		allocator
 	);
@@ -52,7 +71,7 @@ pub fn main() !void {
 		deps.deinit();
 	}
 	
-	try parse(allocator, &deps, file);
+	try parse(allocator, &deps, content);
 	try fetch(allocator, &deps);
 	
 	const out = std.io.getStdOut().writer();
