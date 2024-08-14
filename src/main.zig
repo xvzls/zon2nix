@@ -54,15 +54,34 @@ fn getContent(
 
 pub fn main() !void {
 	var args = std.process.args();
-	_ = args.skip();
-	
-	var arg_map = try arguments.ArgumentMap.parse(args);
-	defer arg_map.deinit();
+	const program_name = args.next().?;
 	
 	var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 	defer _ = gpa.deinit();
 	
 	const allocator = gpa.allocator();
+	
+	var arg_map = arguments.ArgumentMap.parse(
+		allocator,
+		args,
+	) catch |err| {
+		const stderr = std.io.getStdErr().writer();
+		try arguments.ArgumentMap.printHelp(
+			program_name,
+			stderr,
+		);
+		return err;
+	};
+	defer arg_map.deinit(allocator);
+	
+	if (arg_map.help) {
+		const stdout = std.io.getStdOut().writer();
+		try arguments.ArgumentMap.printHelp(
+			program_name,
+			stdout,
+		);
+		return;
+	}
 	
 	const content = try getContent(
 		arg_map.file_path,
