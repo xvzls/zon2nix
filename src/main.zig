@@ -4,6 +4,7 @@ pub const dependency = @import("dependency.zig");
 pub const fetch = @import("fetch.zig").fetch;
 pub const parse = @import("parse.zig").parse;
 pub const write = @import("codegen.zig").write;
+pub const arguments = @import("arguments.zig");
 
 pub const Dependency = dependency.Dependency;
 
@@ -55,13 +56,16 @@ pub fn main() !void {
 	var args = std.process.args();
 	_ = args.skip();
 	
+	var arg_map = try arguments.ArgumentMap.parse(args);
+	defer arg_map.deinit();
+	
 	var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 	defer _ = gpa.deinit();
 	
 	const allocator = gpa.allocator();
 	
 	const content = try getContent(
-		args.next(),
+		arg_map.file_path,
 		allocator,
 	);
 	defer allocator.free(content);
