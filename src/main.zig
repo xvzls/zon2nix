@@ -36,24 +36,32 @@ fn getFile(
 	var sub_dir = try dir.openDir(path, .{});
 	defer sub_dir.close();
 	
-	return sub_dir.openFile("build.zig.zon", .{});
+	return getFile(sub_dir, null);
+}
+
+fn getContent(
+	maybe_path: ?[]const u8,
+	allocator: std.mem.Allocator,
+) ![:0]u8 {
+	const dir = std.fs.cwd();
+	
+	const file = try getFile(dir, maybe_path);
+	defer file.close();
+	
+	return readAllocSentinel(file, allocator);
 }
 
 pub fn main() !void {
 	var args = std.process.args();
 	_ = args.skip();
-	const dir = std.fs.cwd();
-	
-	const file = try getFile(dir, args.next());
-	defer file.close();
 	
 	var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 	defer _ = gpa.deinit();
 	
 	const allocator = gpa.allocator();
 	
-	const content = try readAllocSentinel(
-		file,
+	const content = try getContent(
+		args.next(),
 		allocator,
 	);
 	defer allocator.free(content);
