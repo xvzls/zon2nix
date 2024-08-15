@@ -3,8 +3,9 @@ const std = @import("std");
 pub const dependency = @import("dependency.zig");
 pub const fetch = @import("fetch.zig").fetch;
 pub const parse = @import("parse.zig").parse;
-pub const write = @import("codegen.zig").write;
+pub const codegen = @import("codegen.zig");
 pub const arguments = @import("arguments.zig");
+pub const utils = @import("utils.zig");
 
 pub const Dependency = dependency.Dependency;
 
@@ -107,8 +108,19 @@ pub fn main() !void {
 	
 	const out = std.io.getStdOut().writer();
 	
+	const checksum = utils.checksum(
+		std.crypto.hash.sha2.Sha512,
+		.lower,
+		content,
+	);
+	
 	var buffered_out = std.io.bufferedWriter(out);
-	try write(allocator, &deps, buffered_out.writer());
+	try codegen.write(
+		allocator,
+		&checksum,
+		&deps,
+		buffered_out.writer(),
+	);
 	try buffered_out.flush();
 }
 
