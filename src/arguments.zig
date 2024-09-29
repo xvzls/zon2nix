@@ -1,8 +1,13 @@
 const std = @import("std");
 
-pub const ArgumentMap = struct {
-	help: bool = false,
-	file_path: ?[]u8 = null,
+pub const Arguments = struct {
+	allocator: std.mem.Allocator,
+	commands: union(enum) {
+		default: struct {
+			path: []u8,
+		},
+		help,
+	},
 	
 	pub fn printHelp(
 		program_name: []const u8,
@@ -12,10 +17,10 @@ pub const ArgumentMap = struct {
 			\\Usage: {s} [options] [file-path]
 			\\
 			\\Options:
-			\\  --help     Print help
+			\\  --help  Print help
 			\\
-			\\Arguments:
-			\\  file-path  Path to the ZON (.zon) file
+			\\Parameters:
+			\\  path  Path to the ZON (.zon) file
 			\\
 			,
 			.{
@@ -29,36 +34,36 @@ pub const ArgumentMap = struct {
 		args: std.process.ArgIterator,
 	) !@This() {
 		var args_mut = args;
-		
-		var this = @This(){};
-		
-		while (args_mut.next()) |arg| {
-			if (std.mem.startsWith(u8, arg, "--")) {
-				const option = arg[2 .. ];
-				
-				if (std.mem.eql(u8, option, "help")) {
-					this.help = true;
-					continue;
-				}
-				
-				return error.UnknownOption;
-			}
+		 
+		const arg = args_mut.next()
+			orelse
+		return
+			error.NoArguments;
 			
-			if (this.file_path) |file_path| {
-				allocator.free(file_path);
-			}
-			this.file_path = try allocator.dupe(u8, arg);
+		if (std.mem.startsWith(u8, arg, "--help")) {
+			return .{
+				.allocator = allocator,
+				.commands = .help,
+			};
 		}
 		
-		return this;
+		return .{
+			.allocator = allocator,
+			.commands = .{
+				.default = .{
+					.path = try allocator.dupe(u8, arg),
+				},
+			},
+		};
 	}
 	
-	pub fn deinit(
-		this: *@This(),
-		allocator: std.mem.Allocator,
-	) void {
-		if (this.file_path) |file_path| {
-			allocator.free(file_path);
+	pub fn deinit(this: *@This()) void {
+		const allocator = this.allocator;
+		switch (this.commands) {
+			.default => |default| {
+				allocator.free(default.path);
+			},
+			.help => {},
 		}
 	}
 };

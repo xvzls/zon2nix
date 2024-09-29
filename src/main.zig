@@ -4,54 +4,10 @@ pub const dependency = @import("dependency.zig");
 pub const fetch = @import("fetch.zig").fetch;
 pub const parse = @import("parse.zig").parse;
 pub const codegen = @import("codegen.zig");
-pub const arguments = @import("arguments.zig");
 pub const utils = @import("utils.zig");
+pub const Arguments = @import("arguments.zig").Arguments;
 
 pub const Dependency = dependency.Dependency;
-
-pub fn readAllocSentinel(
-	file: std.fs.File,
-	allocator: std.mem.Allocator,
-) ![:0]u8 {
-	const content = try allocator.allocSentinel(
-		u8,
-		try file.getEndPos(),
-		0,
-	);
-	_ = try file.reader().readAll(content);
-	return content;
-}
-
-fn getFile(
-	dir: std.fs.Dir,
-	maybe_path: ?[]const u8,
-) !std.fs.File {
-	const path = maybe_path orelse {
-		return dir.openFile("build.zig.zon", .{});
-	};
-	
-	const stat = try dir.statFile(path);
-	if (stat.kind != .directory) {
-		return dir.openFile(path, .{});
-	}
-	
-	var sub_dir = try dir.openDir(path, .{});
-	defer sub_dir.close();
-	
-	return getFile(sub_dir, null);
-}
-
-fn getContent(
-	maybe_path: ?[]const u8,
-	allocator: std.mem.Allocator,
-) ![:0]u8 {
-	const dir = std.fs.cwd();
-	
-	const file = try getFile(dir, maybe_path);
-	defer file.close();
-	
-	return readAllocSentinel(file, allocator);
-}
 
 pub fn main() !void {
 	var args = std.process.args();
@@ -62,33 +18,39 @@ pub fn main() !void {
 	
 	const allocator = gpa.allocator();
 	
-	var arg_map = arguments.ArgumentMap.parse(
+	var arguments = Arguments.parse(
 		allocator,
 		args,
 	) catch |err| {
 		const stderr = std.io.getStdErr().writer();
-		try arguments.ArgumentMap.printHelp(
-			program_name,
-			stderr,
-		);
+		try Arguments.printHelp(program_name, stderr);
 		return err;
 	};
-	defer arg_map.deinit(allocator);
+	defer arguments.deinit();
 	
-	if (arg_map.help) {
-		const stdout = std.io.getStdOut().writer();
-		try arguments.ArgumentMap.printHelp(
-			program_name,
-			stdout,
-		);
-		return;
-	}
+	const default = switch (arguments.commands) {
+		.default => |default| default,
+		.help => {
+			const stdout = std.io.getStdOut().writer();
+			try Arguments.printHelp(
+				program_name,
+				stdout,
+			);
+			return;
+		},
+	};
 	
-	const content = try getContent(
-		arg_map.file_path,
-		allocator,
+	const cwd = std.fs.cwd();
+	var file = try cwd.openFile(default.path, .{});
+	defer file.close();
+	
+	const content = try allocator.allocSentinel(
+		u8,
+		try file.getEndPos(),
+		0,
 	);
 	defer allocator.free(content);
+	_ = try file.reader().readAll(content);
 	
 	var deps = std.StringHashMap(Dependency).init(
 		allocator

@@ -5,9 +5,7 @@ Convert the dependencies in `build.zig.zon` to a Nix expression
 ## Usage
 
 ```bash
-zon2nix > build.zig.zon.nix
-zon2nix zls > build.zig.zon.nix
-zon2nix zls/build.zig.zon > build.zig.zon.nix
+zon2nix build.zig.zon > build.zig.zon.nix
 ```
 
 To use the generated file, add this to your `default.nix`:

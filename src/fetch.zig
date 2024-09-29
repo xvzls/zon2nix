@@ -142,11 +142,13 @@ pub fn fetch(
 			};
 			defer file.close();
 			
-			const content = try root.readAllocSentinel(
-				file,
-				allocator,
+			const content = try allocator.allocSentinel(
+				u8,
+				try file.getEndPos(),
+				0,
 			);
 			defer allocator.free(content);
+			_ = try file.reader().readAll(content);
 			
 			try root.parse(allocator, deps, content);
 			if (deps.count() > len_before) {
