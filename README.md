@@ -5,41 +5,41 @@ Convert the dependencies in `build.zig.zon` to a Nix expression
 ## Usage
 
 ```bash
-zon2nix > deps.nix
-zon2nix zls > deps.nix
-zon2nix zls/build.zig.zon > deps.nix
+zon2nix > build.zig.zon.nix
+zon2nix zls > build.zig.zon.nix
+zon2nix zls/build.zig.zon > build.zig.zon.nix
 ```
 
 To use the generated file, add this to your `default.nix`:
 
 ```nix
+with import <nixpkgs> { };
 let
-  pkgs = import <nixpkgs> { };
-  deps = pkgs.callPackage ./deps.nix { };
+	build-zig-zon = pkgs.callPackage ./build-zig-zon.nix { };
 in
 pkgs.stdenv.mkDerivarion {
-  patchPhase = ''
-    
-    # Sha512 sum check
-    
-    sha512_checksum="$(sha512sum build.zig.zon | awk "{print \$1}")"
-    if [ "${deps.sha512-checksum}" != "$sha512_checksum" ]; then
-      >&2 echo "
-      sha512 checksums don't match for build.zig.zon
-        expected: ${deps.sha512-checksum}
-        actual:   $sha512_checksum
-      "
-      exit 1
-    fi
-    
-    # Storing cache
-    
-    export HOME="$TMPDIR"
-    export ZIG_GLOBAL_CACHE_DIR="$HOME/.cache/zig"
-    mkdir -p "$ZIG_GLOBAL_CACHE_DIR"
-    
-    ln -s ${deps.link-farm} "$ZIG_GLOBAL_CACHE_DIR/p"
-  '';
+	patchPhase = ''
+		
+		# Sha512 sum check
+		
+		sha512_checksum="$(sha512sum build.zig.zon | awk "{print \$1}")"
+		if [ "${build-zig-zon.sha512-checksum}" != "$sha512_checksum" ]; then
+			>&2 echo "
+				sha512 checksums don't match for build.zig.zon
+				expected: ${build-zig-zon.sha512-checksum}
+				actual:   $sha512_checksum
+			"
+			exit 1
+		fi
+		
+		# Storing cache
+		
+		export HOME="$TMPDIR"
+		export ZIG_GLOBAL_CACHE_DIR="$HOME/.cache/zig"
+		mkdir -p "$ZIG_GLOBAL_CACHE_DIR"
+		
+		ln -s ${build-zig-zon.link-farm} "$ZIG_GLOBAL_CACHE_DIR/p"
+	'';
 }
 ```
 
@@ -69,15 +69,15 @@ Produces the following nix expression:
 
 { linkFarm, fetchzip }:
 {
-  sha512-checksum = "9cf0cb1f88e6e24d0caa38270a0ac255213f359815e7adfdd19e5f629db47e5f3874ba29745d6680b3113e08aee45ddfb8cc7f3aaf0795c937a878a3d0619889";
-  link-farm = linkFarm "zig-packages" [
-    {
-      name = "122062d301a203d003547b414237229b09a7980095061697349f8bef41be9c30266b";
-      path = fetchzip {
-        url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.9.1.tar.gz";
-        hash = "sha256-pscDsE1jJK1Nktq7rv/ScvsDqvvklFvtiGqOFf2eWvY=";
-      };
-    }
-  ];
+	sha512-checksum = "9cf0cb1f88e6e24d0caa38270a0ac255213f359815e7adfdd19e5f629db47e5f3874ba29745d6680b3113e08aee45ddfb8cc7f3aaf0795c937a878a3d0619889";
+	link-farm = linkFarm "zig-packages" [
+		{
+			name = "122062d301a203d003547b414237229b09a7980095061697349f8bef41be9c30266b";
+			path = fetchzip {
+				url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.9.1.tar.gz";
+				hash = "sha256-pscDsE1jJK1Nktq7rv/ScvsDqvvklFvtiGqOFf2eWvY=";
+			};
+		}
+	];
 }
 ```
