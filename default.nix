@@ -34,7 +34,7 @@ pkgs.stdenv.mkDerivation {
 	'';
 	
 	meta = {
-		homepage = "https://codeberg.org/xvzls/zon2nix";
+		homepage = "https://github.com/xvzls/zon2nix";
 		description = "Convert Zig Zon dependencies to Nix";
 		license = pkgs.lib.licenses.mpl20;
 		mainProgram = "zon2nix";
