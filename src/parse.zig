@@ -57,6 +57,8 @@ fn getFieldIndex(
 
 pub fn parse(
 	allocator: std.mem.Allocator,
+	name: ?*[]u8,
+	version: ?*[]u8,
 	deps: *std.StringHashMap(root.Dependency),
 	content: [:0]const u8,
 ) !void {
@@ -68,6 +70,32 @@ pub fn parse(
 		&buffer,
 		tree.nodes.items(.data)[0].lhs
 	) orelse return error.ParseError;
+	
+	if (name) |value| {
+		value.* = if (try getFieldIndex(
+			allocator,
+			tree,
+			root_init,
+			"name",
+		)) |idx| try parseString(
+			allocator,
+			tree,
+			idx,
+		) else return error.NoNameField;
+	}
+	
+	if (version) |value| {
+		value.* = if (try getFieldIndex(
+			allocator,
+			tree,
+			root_init,
+			"version",
+		)) |idx| try parseString(
+			allocator,
+			tree,
+			idx,
+		) else return error.NoNameField;
+	}
 	
 	const dependencies_idx = try getFieldIndex(
 		allocator,

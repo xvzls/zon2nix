@@ -150,7 +150,7 @@ pub fn fetch(
 			defer allocator.free(content);
 			_ = try file.reader().readAll(content);
 			
-			try root.parse(allocator, deps, content);
+			try root.parse(allocator, null, null, deps, content);
 			if (deps.count() > len_before) {
 				done = false;
 			}

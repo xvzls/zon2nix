@@ -65,7 +65,12 @@ pub fn main() !void {
 		deps.deinit();
 	}
 	
-	try parse(allocator, &deps, content);
+	var name: []u8 = undefined;
+	defer allocator.free(name);
+	var version: []u8 = undefined;
+	defer allocator.free(version);
+	
+	try parse(allocator, &name, &version, &deps, content);
 	try fetch(allocator, &deps);
 	
 	const out = std.io.getStdOut().writer();
@@ -80,6 +85,8 @@ pub fn main() !void {
 	try codegen.write(
 		allocator,
 		&checksum,
+		name,
+		version,
 		&deps,
 		buffered_out.writer(),
 	);

@@ -1,0 +1,8 @@
+.{
+	.name = "zon2nix",
+	.version = "0.2.0",
+	.paths = .{ "" },
+	.dependencies = .{
+		
+	},
+}

@@ -14,6 +14,8 @@ fn lessThan(_: void, lhs: Entry, rhs: Entry) bool {
 pub fn write(
 	allocator: std.mem.Allocator,
 	sha512_checksum: []const u8,
+	name: []const u8,
+	version: []const u8,
 	deps: *const std.StringHashMap(root.Dependency),
 	out: anytype,
 ) !void {
@@ -23,12 +25,19 @@ pub fn write(
 		\\
 		\\{{ linkFarm, fetchzip }}:
 		\\{{
-		\\  sha512-checksum = "{[sha512_checksum]s}";
-		\\  link-farm = linkFarm "zig-packages" [
+		\\  # A sha512 checksum of the contents of
+		\\  # build.zig.zon
+		\\  checksum = "{[checksum]s}";
+		\\  
+		\\  name = "{[name]s}";
+		\\  version = "{[version]s}";
+		\\  dependencies = linkFarm "zig-packages" [
 		\\
 		,
 		.{
-			.sha512_checksum = sha512_checksum,
+			.checksum = sha512_checksum,
+			.name = name,
+			.version = version,
 		}
 	);
 	
