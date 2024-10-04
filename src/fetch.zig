@@ -14,17 +14,17 @@ const Worker = struct {
 
 pub fn fetch(
 	allocator: std.mem.Allocator,
-	deps: *std.StringHashMap(root.Dependency),
+	manifest: *root.Manifest,
 ) !void {
 	var workers = try std.ArrayList(Worker).initCapacity(
 		allocator,
-		deps.count(),
+		manifest.dependencies.count(),
 	);
 	defer workers.deinit();
 	var done = false;
 	
 	while (!done) {
-		var iter = deps.valueIterator();
+		var iter = manifest.dependencies.valueIterator();
 		while (iter.next()) |dep| {
 			if (dep.done) {
 				continue;
@@ -64,7 +64,7 @@ pub fn fetch(
 			});
 		}
 		
-		const len_before = deps.count();
+		const len_before = manifest.dependencies.count();
 		done = true;
 		
 		for (workers.items) |worker| {
@@ -150,8 +150,8 @@ pub fn fetch(
 			defer allocator.free(content);
 			_ = try file.reader().readAll(content);
 			
-			try root.parse(allocator, null, null, deps, content);
-			if (deps.count() > len_before) {
+			try root.parseAppendDeps(manifest, content);
+			if (manifest.dependencies.count() > len_before) {
 				done = false;
 			}
 		}

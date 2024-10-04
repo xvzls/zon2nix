@@ -14,9 +14,7 @@ fn lessThan(_: void, lhs: Entry, rhs: Entry) bool {
 pub fn write(
 	allocator: std.mem.Allocator,
 	sha512_checksum: []const u8,
-	name: []const u8,
-	version: []const u8,
-	deps: *const std.StringHashMap(root.Dependency),
+	manifest: *const root.Manifest,
 	out: anytype,
 ) !void {
 	try out.print(
@@ -36,16 +34,16 @@ pub fn write(
 		,
 		.{
 			.checksum = sha512_checksum,
-			.name = name,
-			.version = version,
+			.name = manifest.name.items,
+			.version = manifest.version.items,
 		}
 	);
 	
-	const len = deps.count();
+	const len = manifest.dependencies.count();
 	var entries = try allocator.alloc(Entry, len);
 	defer allocator.free(entries);
 	
-	var iter = deps.iterator();
+	var iter = manifest.dependencies.iterator();
 	for (0..len) |i| {
 		entries[i] = iter.next().?;
 	}

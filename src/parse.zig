@@ -57,11 +57,11 @@ fn getFieldIndex(
 
 pub fn parse(
 	allocator: std.mem.Allocator,
-	name: ?*[]u8,
-	version: ?*[]u8,
-	deps: *std.StringHashMap(root.Dependency),
 	content: [:0]const u8,
-) !void {
+) !root.Manifest {
+	var manifest = try root.Manifest.init(allocator);
+	errdefer manifest.deinit();
+	
 	var tree = try Ast.parse(allocator, content, .zon);
 	defer tree.deinit(allocator);
 	
@@ -71,31 +71,51 @@ pub fn parse(
 		tree.nodes.items(.data)[0].lhs
 	) orelse return error.ParseError;
 	
-	if (name) |value| {
-		value.* = if (try getFieldIndex(
-			allocator,
-			tree,
-			root_init,
-			"name",
-		)) |idx| try parseString(
-			allocator,
-			tree,
-			idx,
-		) else return error.NoNameField;
-	}
+	const name = if (try getFieldIndex(
+		allocator,
+		tree,
+		root_init,
+		"name",
+	)) |idx| try parseString(
+		allocator,
+		tree,
+		idx,
+	) else return error.NoNameField;
+	defer allocator.free(name);
+	try manifest.name.appendSlice(allocator, name);
 	
-	if (version) |value| {
-		value.* = if (try getFieldIndex(
-			allocator,
-			tree,
-			root_init,
-			"version",
-		)) |idx| try parseString(
-			allocator,
-			tree,
-			idx,
-		) else return error.NoNameField;
-	}
+	const version = if (try getFieldIndex(
+		allocator,
+		tree,
+		root_init,
+		"version",
+	)) |idx| try parseString(
+		allocator,
+		tree,
+		idx,
+	) else return error.NoVersionField;
+	defer allocator.free(version);
+	try manifest.version.appendSlice(allocator, version);
+	
+	try parseAppendDeps(&manifest, content);
+	
+	return manifest;
+}
+
+pub fn parseAppendDeps(
+	manifest: *root.Manifest,
+	content: [:0]const u8,
+) !void {
+	const allocator = manifest.allocator;
+	
+	var tree = try Ast.parse(allocator, content, .zon);
+	defer tree.deinit(allocator);
+	
+	var buffer: [2]Ast.Node.Index = undefined;
+	const root_init = tree.fullStructInit(
+		&buffer,
+		tree.nodes.items(.data)[0].lhs
+	) orelse return error.ParseError;
 	
 	const dependencies_idx = try getFieldIndex(
 		allocator,
@@ -138,7 +158,8 @@ pub fn parse(
 		) else null;
 		
 		if (hash != null and url != null) {
-			_ = try deps.getOrPutValue(
+			_ = try manifest.dependencies.getOrPutValue(
+				allocator,
 				hash.?,
 				.{
 					.url = url.?,
