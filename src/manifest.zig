@@ -1,4 +1,4 @@
-const root = @import("root");
+const root = @import("root.zig");
 const std = @import("std");
 
 pub const Manifest = struct {

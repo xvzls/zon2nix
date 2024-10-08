@@ -1,6 +1,5 @@
-const root = @import("root");
+const root = @import("root.zig");
 const std = @import("std");
-const nix = @import("options").nix;
 
 const Prefetch = struct {
 	hash: []const u8,
@@ -41,7 +40,7 @@ pub fn fetch(
 			defer allocator.free(ref);
 			
 			const argv = &[_][]const u8{
-				nix,
+				"nix",
 				"flake",
 				"prefetch",
 				"--json",
@@ -150,7 +149,7 @@ pub fn fetch(
 			defer allocator.free(content);
 			_ = try file.reader().readAll(content);
 			
-			try root.parseAppendDeps(manifest, content);
+			try root.parse.appendDeps(manifest, content);
 			if (manifest.dependencies.count() > len_before) {
 				done = false;
 			}

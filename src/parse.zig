@@ -1,4 +1,4 @@
-const root = @import("root");
+const root = @import("root.zig");
 const std = @import("std");
 
 const Ast = std.zig.Ast;
@@ -97,12 +97,12 @@ pub fn parse(
 	defer allocator.free(version);
 	try manifest.version.appendSlice(allocator, version);
 	
-	try parseAppendDeps(&manifest, content);
+	try appendDeps(&manifest, content);
 	
 	return manifest;
 }
 
-pub fn parseAppendDeps(
+pub fn appendDeps(
 	manifest: *root.Manifest,
 	content: [:0]const u8,
 ) !void {
@@ -172,24 +172,50 @@ pub fn parseAppendDeps(
 }
 
 test parse {
-	const fs = std.fs;
-	const heap = std.heap;
-	const testing = std.testing;
-
-	var arena = heap.ArenaAllocator.init(testing.allocator);
+	var arena = std.heap.ArenaAllocator.init(
+		std.testing.allocator
+	);
 	defer arena.deinit();
-	const alloc = arena.allocator();
-
-	var deps = std.StringHashMap(
-		root.Dependency
-	).init(alloc);
-	const basic = try fs.cwd().openFile("fixtures/basic.zon", .{});
-	try parse(alloc, &deps, basic);
-	basic.close();
-
-	try testing.expectEqual(deps.count(), 3);
-	try testing.expectEqualStrings(deps.get("122048992ca58a78318b6eba4f65c692564be5af3b30fbef50cd4abeda981b2e7fa5").?.url, "https://github.com/ziglibs/known-folders/archive/fa75e1bc672952efa0cf06160bbd942b47f6d59b.tar.gz");
-	try testing.expectEqualStrings(deps.get("122089a8247a693cad53beb161bde6c30f71376cd4298798d45b32740c3581405864").?.url, "https://github.com/ziglibs/diffz/archive/90353d401c59e2ca5ed0abe5444c29ad3d7489aa.tar.gz");
-	try testing.expectEqualStrings(deps.get("1220363c7e27b2d3f39de6ff6e90f9537a0634199860fea237a55ddb1e1717f5d6a5").?.url, "https://gist.github.com/antlilja/8372900fcc09e38d7b0b6bbaddad3904/archive/6c3321e0969ff2463f8335da5601986cf2108690.tar.gz");
+	const allocator = arena.allocator();
+	
+	var file = try std.fs.cwd().openFile(
+		"fixtures/basic.zon",
+		.{}
+	);
+	defer file.close();
+	
+	const content = try allocator.allocSentinel(
+		u8,
+		try file.getEndPos(),
+		0,
+	);
+	defer allocator.free(content);
+	_ = try file.reader().readAll(content);
+	
+	var manifest = try parse(allocator, content);
+	
+	try std.testing.expectEqual(
+		manifest.dependencies.count(),
+		3
+	);
+	
+	try std.testing.expectEqualStrings(
+		manifest.dependencies.get(
+			"122048992ca58a78318b6eba4f65c692564be5af3b30fbef50cd4abeda981b2e7fa5"
+		).?.url,
+		"https://github.com/ziglibs/known-folders/archive/fa75e1bc672952efa0cf06160bbd942b47f6d59b.tar.gz"
+	);
+	try std.testing.expectEqualStrings(
+		manifest.dependencies.get(
+			"122089a8247a693cad53beb161bde6c30f71376cd4298798d45b32740c3581405864"
+		).?.url,
+		"https://github.com/ziglibs/diffz/archive/90353d401c59e2ca5ed0abe5444c29ad3d7489aa.tar.gz"
+	);
+	try std.testing.expectEqualStrings(
+		manifest.dependencies.get(
+			"1220363c7e27b2d3f39de6ff6e90f9537a0634199860fea237a55ddb1e1717f5d6a5"
+		).?.url,
+		"https://gist.github.com/antlilja/8372900fcc09e38d7b0b6bbaddad3904/archive/6c3321e0969ff2463f8335da5601986cf2108690.tar.gz"
+	);
 }
 

@@ -1,15 +1,11 @@
 const std = @import("std");
+const zon2nix = @import("zon2nix");
 
-pub const dependency = @import("dependency.zig");
-pub const fetch = @import("fetch.zig").fetch;
-pub const parse = @import("parse.zig").parse;
-pub const parseAppendDeps = @import("parse.zig").parseAppendDeps;
-pub const codegen = @import("codegen.zig");
-pub const utils = @import("utils.zig");
+test {
+	std.testing.refAllDeclsRecursive(@This());
+}
+
 pub const Arguments = @import("arguments.zig").Arguments;
-pub const Manifest = @import("manifest.zig").Manifest;
-
-pub const Dependency = dependency.Dependency;
 
 pub fn main() !void {
 	var args = std.process.args();
@@ -54,30 +50,26 @@ pub fn main() !void {
 	defer allocator.free(content);
 	_ = try file.reader().readAll(content);
 	
-	var manifest = try parse(allocator, content);
+	var manifest = try zon2nix.parse.parse(allocator, content);
 	defer manifest.deinit();
 	
-	try fetch(allocator, &manifest);
+	try zon2nix.fetch.fetch(allocator, &manifest);
 	
 	const out = std.io.getStdOut().writer();
 	
-	const checksum = utils.checksum(
+	const checksum = zon2nix.utils.checksum(
 		std.crypto.hash.sha2.Sha512,
 		.lower,
 		content,
 	);
 	
 	var buffered_out = std.io.bufferedWriter(out);
-	try codegen.write(
+	try zon2nix.codegen.write(
 		allocator,
 		&checksum,
 		&manifest,
 		buffered_out.writer(),
 	);
 	try buffered_out.flush();
-}
-
-comptime {
-	std.testing.refAllDecls(@This());
 }
 
