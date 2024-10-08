@@ -149,7 +149,7 @@ pub fn fetch(
 			defer allocator.free(content);
 			_ = try file.reader().readAll(content);
 			
-			try root.parse.appendDeps(manifest, content);
+			try manifest.appendDeps(content);
 			if (manifest.dependencies.count() > len_before) {
 				done = false;
 			}

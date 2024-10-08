@@ -5,7 +5,6 @@ pub const Dependency = dependency.Dependency;
 pub const manifest = @import("manifest.zig");
 pub const Manifest = manifest.Manifest;
 pub const fetch = @import("fetch.zig");
-pub const parse = @import("parse.zig");
 pub const codegen = @import("codegen.zig");
 pub const utils = @import("utils.zig");
 

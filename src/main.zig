@@ -50,7 +50,10 @@ pub fn main() !void {
 	defer allocator.free(content);
 	_ = try file.reader().readAll(content);
 	
-	var manifest = try zon2nix.parse.parse(allocator, content);
+	var manifest = try zon2nix.Manifest.parse(
+		allocator,
+		content
+	);
 	defer manifest.deinit();
 	
 	try zon2nix.fetch.fetch(allocator, &manifest);
