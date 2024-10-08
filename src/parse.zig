@@ -199,23 +199,25 @@ test parse {
 		3
 	);
 	
-	try std.testing.expectEqualStrings(
-		manifest.dependencies.get(
-			"122048992ca58a78318b6eba4f65c692564be5af3b30fbef50cd4abeda981b2e7fa5"
-		).?.url,
-		"https://github.com/ziglibs/known-folders/archive/fa75e1bc672952efa0cf06160bbd942b47f6d59b.tar.gz"
-	);
-	try std.testing.expectEqualStrings(
-		manifest.dependencies.get(
-			"122089a8247a693cad53beb161bde6c30f71376cd4298798d45b32740c3581405864"
-		).?.url,
-		"https://github.com/ziglibs/diffz/archive/90353d401c59e2ca5ed0abe5444c29ad3d7489aa.tar.gz"
-	);
-	try std.testing.expectEqualStrings(
-		manifest.dependencies.get(
-			"1220363c7e27b2d3f39de6ff6e90f9537a0634199860fea237a55ddb1e1717f5d6a5"
-		).?.url,
-		"https://gist.github.com/antlilja/8372900fcc09e38d7b0b6bbaddad3904/archive/6c3321e0969ff2463f8335da5601986cf2108690.tar.gz"
-	);
+	for ([_]struct { []const u8, []const u8 }{
+		.{
+			"122048992ca58a78318b6eba4f65c692564be5af3b30fbef50cd4abeda981b2e7fa5",
+			"https://github.com/ziglibs/known-folders/archive/fa75e1bc672952efa0cf06160bbd942b47f6d59b.tar.gz",
+		},
+		.{
+			"122089a8247a693cad53beb161bde6c30f71376cd4298798d45b32740c3581405864",
+			"https://github.com/ziglibs/diffz/archive/90353d401c59e2ca5ed0abe5444c29ad3d7489aa.tar.gz",
+		},
+		.{
+			"1220363c7e27b2d3f39de6ff6e90f9537a0634199860fea237a55ddb1e1717f5d6a5",
+			"https://gist.github.com/antlilja/8372900fcc09e38d7b0b6bbaddad3904/archive/6c3321e0969ff2463f8335da5601986cf2108690.tar.gz",
+		},
+	}) |tuple| {
+		const hash, const url = tuple;
+		try std.testing.expectEqualStrings(
+			manifest.dependencies.get(hash).?.url,
+			url
+		);
+	}
 }
 
