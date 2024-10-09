@@ -1,57 +1,11 @@
 const std = @import("std");
+const zon2nix = @import("zon2nix");
 
-pub const dependency = @import("dependency.zig");
-pub const fetch = @import("fetch.zig").fetch;
-pub const parse = @import("parse.zig").parse;
-pub const codegen = @import("codegen.zig");
-pub const arguments = @import("arguments.zig");
-pub const utils = @import("utils.zig");
-
-pub const Dependency = dependency.Dependency;
-
-pub fn readAllocSentinel(
-	file: std.fs.File,
-	allocator: std.mem.Allocator,
-) ![:0]u8 {
-	const content = try allocator.allocSentinel(
-		u8,
-		try file.getEndPos(),
-		0,
-	);
-	_ = try file.reader().readAll(content);
-	return content;
+test {
+	std.testing.refAllDeclsRecursive(@This());
 }
 
-fn getFile(
-	dir: std.fs.Dir,
-	maybe_path: ?[]const u8,
-) !std.fs.File {
-	const path = maybe_path orelse {
-		return dir.openFile("build.zig.zon", .{});
-	};
-	
-	const stat = try dir.statFile(path);
-	if (stat.kind != .directory) {
-		return dir.openFile(path, .{});
-	}
-	
-	var sub_dir = try dir.openDir(path, .{});
-	defer sub_dir.close();
-	
-	return getFile(sub_dir, null);
-}
-
-fn getContent(
-	maybe_path: ?[]const u8,
-	allocator: std.mem.Allocator,
-) ![:0]u8 {
-	const dir = std.fs.cwd();
-	
-	const file = try getFile(dir, maybe_path);
-	defer file.close();
-	
-	return readAllocSentinel(file, allocator);
-}
+pub const Arguments = @import("arguments.zig").Arguments;
 
 pub fn main() !void {
 	var args = std.process.args();
@@ -62,69 +16,60 @@ pub fn main() !void {
 	
 	const allocator = gpa.allocator();
 	
-	var arg_map = arguments.ArgumentMap.parse(
-		allocator,
-		args,
-	) catch |err| {
+	const arguments = Arguments.parse(args) catch |err| {
 		const stderr = std.io.getStdErr().writer();
-		try arguments.ArgumentMap.printHelp(
-			program_name,
-			stderr,
-		);
+		try Arguments.printHelp(program_name, stderr);
 		return err;
 	};
-	defer arg_map.deinit(allocator);
 	
-	if (arg_map.help) {
-		const stdout = std.io.getStdOut().writer();
-		try arguments.ArgumentMap.printHelp(
-			program_name,
-			stdout,
-		);
-		return;
+	switch (arguments.command) {
+		.default => {},
+		.help => {
+			const stdout = std.io.getStdOut().writer();
+			try Arguments.printHelp(
+				program_name,
+				stdout,
+			);
+			return;
+		},
 	}
 	
-	const content = try getContent(
-		arg_map.file_path,
+	const file = std.io.getStdIn();
+	defer file.close();
+	
+	var list = try std.ArrayList(u8).initCapacity(
 		allocator,
+		1 << 10
 	);
+	defer list.deinit();
+	try file.reader().readAllArrayList(&list, 1 << 16);
+	
+	const content = try list.toOwnedSliceSentinel(0);
 	defer allocator.free(content);
 	
-	var deps = std.StringHashMap(Dependency).init(
-		allocator
+	var manifest = try zon2nix.Manifest.parse(
+		allocator,
+		content
 	);
-	defer {
-		var iter = deps.iterator();
-		while (iter.next()) |entry| {
-			allocator.free(entry.key_ptr.*);
-			entry.value_ptr.deinit(allocator);
-		}
-		deps.clearAndFree();
-		deps.deinit();
-	}
+	defer manifest.deinit();
 	
-	try parse(allocator, &deps, content);
-	try fetch(allocator, &deps);
+	try zon2nix.fetch.fetch(allocator, &manifest);
 	
 	const out = std.io.getStdOut().writer();
 	
-	const checksum = utils.checksum(
+	const checksum = zon2nix.utils.checksum(
 		std.crypto.hash.sha2.Sha512,
 		.lower,
 		content,
 	);
 	
 	var buffered_out = std.io.bufferedWriter(out);
-	try codegen.write(
+	try zon2nix.codegen.write(
 		allocator,
 		&checksum,
-		&deps,
+		&manifest,
 		buffered_out.writer(),
 	);
 	try buffered_out.flush();
-}
-
-comptime {
-	std.testing.refAllDecls(@This());
 }
 

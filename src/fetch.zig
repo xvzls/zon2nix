@@ -1,6 +1,5 @@
-const root = @import("root");
+const root = @import("root.zig");
 const std = @import("std");
-const nix = @import("options").nix;
 
 const Prefetch = struct {
 	hash: []const u8,
@@ -14,17 +13,17 @@ const Worker = struct {
 
 pub fn fetch(
 	allocator: std.mem.Allocator,
-	deps: *std.StringHashMap(root.Dependency),
+	manifest: *root.Manifest,
 ) !void {
 	var workers = try std.ArrayList(Worker).initCapacity(
 		allocator,
-		deps.count(),
+		manifest.dependencies.count(),
 	);
 	defer workers.deinit();
 	var done = false;
 	
 	while (!done) {
-		var iter = deps.valueIterator();
+		var iter = manifest.dependencies.valueIterator();
 		while (iter.next()) |dep| {
 			if (dep.done) {
 				continue;
@@ -41,7 +40,7 @@ pub fn fetch(
 			defer allocator.free(ref);
 			
 			const argv = &[_][]const u8{
-				nix,
+				"nix",
 				"flake",
 				"prefetch",
 				"--json",
@@ -64,7 +63,7 @@ pub fn fetch(
 			});
 		}
 		
-		const len_before = deps.count();
+		const len_before = manifest.dependencies.count();
 		done = true;
 		
 		for (workers.items) |worker| {
@@ -142,14 +141,16 @@ pub fn fetch(
 			};
 			defer file.close();
 			
-			const content = try root.readAllocSentinel(
-				file,
-				allocator,
+			const content = try allocator.allocSentinel(
+				u8,
+				try file.getEndPos(),
+				0,
 			);
 			defer allocator.free(content);
+			_ = try file.reader().readAll(content);
 			
-			try root.parse(allocator, deps, content);
-			if (deps.count() > len_before) {
+			try manifest.appendDeps(content);
+			if (manifest.dependencies.count() > len_before) {
 				done = false;
 			}
 		}
