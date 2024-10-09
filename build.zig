@@ -6,16 +6,6 @@ pub fn build(b: *std.Build) void {
 	
 	const name = "zon2nix";
 	
-	// Library
-	
-	const lib = b.addSharedLibrary(.{
-		.name = name,
-		.root_source_file = b.path("src/root.zig"),
-		.target = target,
-		.optimize = optimize,
-	});
-	b.installArtifact(lib);
-	
 	// Module
 	
 	const mod = b.addModule(name, .{
