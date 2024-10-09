@@ -16,18 +16,14 @@ pub fn main() !void {
 	
 	const allocator = gpa.allocator();
 	
-	var arguments = Arguments.parse(
-		allocator,
-		args,
-	) catch |err| {
+	const arguments = Arguments.parse(args) catch |err| {
 		const stderr = std.io.getStdErr().writer();
 		try Arguments.printHelp(program_name, stderr);
 		return err;
 	};
-	defer arguments.deinit();
 	
-	const default = switch (arguments.commands) {
-		.default => |default| default,
+	switch (arguments.command) {
+		.default => {},
 		.help => {
 			const stdout = std.io.getStdOut().writer();
 			try Arguments.printHelp(
@@ -36,19 +32,20 @@ pub fn main() !void {
 			);
 			return;
 		},
-	};
+	}
 	
-	const cwd = std.fs.cwd();
-	var file = try cwd.openFile(default.path, .{});
+	const file = std.io.getStdIn();
 	defer file.close();
 	
-	const content = try allocator.allocSentinel(
-		u8,
-		try file.getEndPos(),
-		0,
+	var list = try std.ArrayList(u8).initCapacity(
+		allocator,
+		1 << 10
 	);
+	defer list.deinit();
+	try file.reader().readAllArrayList(&list, 1 << 16);
+	
+	const content = try list.toOwnedSliceSentinel(0);
 	defer allocator.free(content);
-	_ = try file.reader().readAll(content);
 	
 	var manifest = try zon2nix.Manifest.parse(
 		allocator,

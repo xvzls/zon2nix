@@ -1,26 +1,29 @@
 const std = @import("std");
 
+pub const Commands = enum {
+	default,
+	help,
+};
+
 pub const Arguments = struct {
-	allocator: std.mem.Allocator,
-	commands: union(enum) {
-		default: struct {
-			path: []u8,
-		},
-		help,
-	},
+	command: Commands,
 	
 	pub fn printHelp(
 		program_name: []const u8,
 		writer: anytype,
 	) !void {
 		try writer.print(
-			\\Usage: {s} [options] [file-path]
+			\\Usage: {s} [subcommand]
 			\\
-			\\Options:
-			\\  --help  Print help
+			\\Input:
+			\\  <stdin>  Zon file contents
 			\\
-			\\Parameters:
-			\\  path  Path to the ZON (.zon) file
+			\\Subcommands:
+			\\  help  Print help
+			\\
+			\\Examples:
+			\\  Convert `build.zig.zon` to a nix file
+			\\  $ zon2nix < build.zig.zon > build.zig.zon.nix
 			\\
 			,
 			.{
@@ -30,41 +33,28 @@ pub const Arguments = struct {
 	}
 	
 	pub fn parse(
-		allocator: std.mem.Allocator,
 		args: std.process.ArgIterator,
 	) !@This() {
 		var args_mut = args;
 		 
-		const arg = args_mut.next()
-			orelse
-		return
-			error.NoArguments;
-			
-		if (std.mem.startsWith(u8, arg, "--help")) {
-			return .{
-				.allocator = allocator,
-				.commands = .help,
-			};
+		const arg = args_mut.next() orelse return .{
+			.command = .default,
+		};
+		
+		for (std.enums.values(Commands)) |command| {
+			if (std.mem.eql(
+				u8,
+				arg,
+				// std.enums.tagName(Commands, command)
+				@tagName(command)
+			)) {
+				return .{
+					.command = command,
+				};
+			}
 		}
 		
-		return .{
-			.allocator = allocator,
-			.commands = .{
-				.default = .{
-					.path = try allocator.dupe(u8, arg),
-				},
-			},
-		};
-	}
-	
-	pub fn deinit(this: *@This()) void {
-		const allocator = this.allocator;
-		switch (this.commands) {
-			.default => |default| {
-				allocator.free(default.path);
-			},
-			.help => {},
-		}
+		return error.InvalidCommand;
 	}
 };
 
