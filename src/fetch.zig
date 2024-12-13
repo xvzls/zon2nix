@@ -19,7 +19,6 @@ pub fn fetch(
 		allocator,
 		manifest.dependencies.count(),
 	);
-	defer workers.deinit();
 	var done = false;
 	
 	while (!done) {
@@ -37,7 +36,6 @@ pub fn fetch(
 				"tarball+{s}",
 				.{ dep.url },
 			);
-			defer allocator.free(ref);
 			
 			const argv = &[_][]const u8{
 				"nix",
@@ -70,21 +68,17 @@ pub fn fetch(
 			const child = worker.child;
 			const dep = worker.dep;
 			
-			defer allocator.destroy(child);
-			
 			var reader = std.json.reader(
 				allocator,
 				child.stdout.?.reader(),
 			);
-			defer reader.deinit();
 			
-			var res = try std.json.parseFromTokenSource(
+			const res = try std.json.parseFromTokenSource(
 				Prefetch,
 				allocator,
 				&reader,
 				.{ .ignore_unknown_fields = true },
 			);
-			defer res.deinit();
 			
 			switch (try child.wait()) {
 				.Exited => |code| if (code != 0) {
@@ -130,7 +124,6 @@ pub fn fetch(
 					"build.zig.zon",
 				},
 			);
-			defer allocator.free(path);
 			
 			const file = std.fs.openFileAbsolute(
 				path,
@@ -146,7 +139,6 @@ pub fn fetch(
 				try file.getEndPos(),
 				0,
 			);
-			defer allocator.free(content);
 			_ = try file.reader().readAll(content);
 			
 			try manifest.appendDeps(content);

@@ -1,20 +1,18 @@
 const std = @import("std");
 const zon2nix = @import("zon2nix");
 
-test {
-	std.testing.refAllDeclsRecursive(@This());
-}
-
-pub const Arguments = @import("arguments.zig").Arguments;
+pub const Arguments = @import("Arguments.zig");
 
 pub fn main() !void {
 	var args = std.process.args();
 	const program_name = args.next().?;
 	
-	var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-	defer _ = gpa.deinit();
+	var arena = std.heap.ArenaAllocator.init(
+		std.heap.page_allocator
+	);
+	defer arena.deinit();
 	
-	const allocator = gpa.allocator();
+	const allocator = arena.allocator();
 	
 	const arguments = Arguments.parse(args) catch |err| {
 		const stderr = std.io.getStdErr().writer();
@@ -71,5 +69,9 @@ pub fn main() !void {
 		buffered_out.writer(),
 	);
 	try buffered_out.flush();
+}
+
+comptime {
+	std.testing.refAllDeclsRecursive(@This());
 }
 

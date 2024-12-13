@@ -16,7 +16,7 @@ pkgs.stdenv.mkDerivation {
 		unstable.zig
 	];
 	
-	preBuild = ''
+	patchPhase = ''
 		checksum="$(sha512sum build.zig.zon | awk "{print \$1}")"
 		if [ "${zon.checksum}" != "$checksum" ]; then
 			>&2 echo "
@@ -33,15 +33,11 @@ pkgs.stdenv.mkDerivation {
 	'';
 	
 	buildPhase = ''
-		runHook preBuild
 		zig build --prefix $out --release=fast
-		runHook postBuild
 	'';
 	
 	installPhase = ''
-		runHook preInstall
 		zig build --prefix $out --release=fast install
-		runHook postInstall
 	'';
 	
 	meta = {
