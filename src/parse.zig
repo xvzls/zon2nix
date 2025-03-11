@@ -21,7 +21,7 @@ fn parseAppendDependenciesPrivate(
     const deps_init = ast.fullStructInit(&deps_buf, field_idx) orelse {
         return error.ParseError;
     };
-    
+
     for (deps_init.ast.fields) |dep_idx| {
         var dep: Dependency = .{
             .url = undefined,
@@ -59,7 +59,7 @@ fn parseAppendDependenciesPrivate(
 }
 
 pub fn parse(alloc: Allocator, file: File) !Meta {
-    var meta = Meta {
+    var meta = Meta{
         .name = "TODO",
         .version = "TODO",
         .fingerprint = 0,
@@ -77,9 +77,7 @@ pub fn parse(alloc: Allocator, file: File) !Meta {
 
     for (root_init.ast.fields) |field_idx| {
         if (mem.eql(u8, try parseFieldName(alloc, ast, field_idx), "name")) {
-            meta.name = ast.tokenSlice(
-                ast.nodes.items(.main_token)[field_idx]
-            );
+            meta.name = ast.tokenSlice(ast.nodes.items(.main_token)[field_idx]);
             continue;
         }
         if (mem.eql(u8, try parseFieldName(alloc, ast, field_idx), "version")) {
@@ -87,9 +85,7 @@ pub fn parse(alloc: Allocator, file: File) !Meta {
             continue;
         }
         if (mem.eql(u8, try parseFieldName(alloc, ast, field_idx), "fingerprint")) {
-            const string = ast.tokenSlice(
-                ast.nodes.items(.main_token)[field_idx]
-            );
+            const string = ast.tokenSlice(ast.nodes.items(.main_token)[field_idx]);
             meta.fingerprint = std.zig.number_literal.parseNumberLiteral(string).int;
             // std.zig.parseAlloc(alloc, ast.tokenSlice(ast.nodes.items(.main_token)[idx]));
             continue;
@@ -99,7 +95,7 @@ pub fn parse(alloc: Allocator, file: File) !Meta {
             continue;
         }
     }
-    
+
     return meta;
 }
 
@@ -125,7 +121,6 @@ pub fn parseAppendDependencies(
         }
     }
 }
-
 
 fn parseFieldName(alloc: Allocator, ast: Ast, idx: Index) ![]const u8 {
     const name = ast.tokenSlice(ast.firstToken(idx) - 2);

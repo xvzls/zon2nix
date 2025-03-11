@@ -20,17 +20,17 @@ pub fn write(alloc: Allocator, out: anytype, meta: *const Meta) !void {
     );
 
     // name
-    try out.print("  name = \"{s}\";\n", .{ meta.name });
-    
+    try out.print("  name = \"{s}\";\n", .{meta.name});
+
     // version
-    try out.print("  version = \"{s}\";\n", .{ meta.version });
-    
+    try out.print("  version = \"{s}\";\n", .{meta.version});
+
     // fingerprint
     // note:
     //   nix does not have support for bases other than
     //   10, so a string is used instead
-    try out.print("  fingerprint = \"0x{x}\";\n", .{ meta.fingerprint });
-    
+    try out.print("  fingerprint = \"0x{x}\";\n", .{meta.fingerprint});
+
     // dependencies
     try out.writeAll(
         \\  dependencies = linkFarm "zig-packages" [
@@ -63,7 +63,7 @@ pub fn write(alloc: Allocator, out: anytype, meta: *const Meta) !void {
     }
 
     try out.writeAll("  ];\n");
-    
+
     // end
     try out.writeAll("}\n");
 }
