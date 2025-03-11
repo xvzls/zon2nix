@@ -12,7 +12,7 @@ const log = std.log;
 const nix = @import("options").nix;
 
 const Dependency = @import("Dependency.zig");
-const parse = @import("parse.zig").parse;
+const parse = @import("parse.zig");
 
 const Prefetch = struct {
     hash: []const u8,
@@ -91,7 +91,7 @@ pub fn fetch(alloc: Allocator, deps: *StringHashMap(Dependency)) !void {
             };
             defer file.close();
 
-            try parse(alloc, deps, file);
+            try parse.parseAppendDependencies(alloc, deps, file);
             if (deps.count() > len_before) {
                 done = false;
             }
