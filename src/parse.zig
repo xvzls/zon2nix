@@ -60,8 +60,9 @@ fn parseAppendDependenciesPrivate(
 
 pub fn parse(alloc: Allocator, file: File) !Meta {
     var meta = Meta {
-        // .name = "TODO",
-        // .version = "TODO",
+        .name = "TODO",
+        .version = "TODO",
+        .fingerprint = 0,
         .dependencies = StringHashMap(Dependency).init(alloc),
     };
     const content = try alloc.allocSentinel(u8, try file.getEndPos(), 0);
@@ -75,9 +76,27 @@ pub fn parse(alloc: Allocator, file: File) !Meta {
     };
 
     for (root_init.ast.fields) |field_idx| {
+        if (mem.eql(u8, try parseFieldName(alloc, ast, field_idx), "name")) {
+            meta.name = ast.tokenSlice(
+                ast.nodes.items(.main_token)[field_idx]
+            );
+            continue;
+        }
+        if (mem.eql(u8, try parseFieldName(alloc, ast, field_idx), "version")) {
+            meta.version = try parseString(alloc, ast, field_idx);
+            continue;
+        }
+        if (mem.eql(u8, try parseFieldName(alloc, ast, field_idx), "fingerprint")) {
+            const string = ast.tokenSlice(
+                ast.nodes.items(.main_token)[field_idx]
+            );
+            meta.fingerprint = std.zig.number_literal.parseNumberLiteral(string).int;
+            // std.zig.parseAlloc(alloc, ast.tokenSlice(ast.nodes.items(.main_token)[idx]));
+            continue;
+        }
         if (mem.eql(u8, try parseFieldName(alloc, ast, field_idx), "dependencies")) {
             try parseAppendDependenciesPrivate(alloc, ast, field_idx, &meta.dependencies);
-            break;
+            continue;
         }
     }
     
