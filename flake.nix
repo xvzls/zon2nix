@@ -2,71 +2,25 @@
   description = "zon2nix helps you package Zig project with Nix, by converting the dependencies in a build.zig.zon to a Nix expression.";
 
   inputs = {
-    flake-parts = {
-      url = "github:hercules-ci/flake-parts";
-      inputs.nixpkgs-lib.follows = "nixpkgs";
-    };
+    flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    zig-overlay = {
-      url = "github:mitchellh/zig-overlay";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs =
-    inputs@{ flake-parts, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = [
-        "aarch64-darwin"
-        "aarch64-linux"
-        "x86_64-darwin"
-        "x86_64-linux"
-      ];
-
-      flake.herculesCI.ciSystems = [
-        "aarch64-linux"
-        "x86_64-linux"
-      ];
-
-      perSystem =
-        {
-          system,
-          lib,
-          pkgs,
-          ...
-        }:
-        let
-          inherit (pkgs)
-            callPackage
-            zigpkgs
-            zig_0_13
-            ;
-        in
-        {
-          _module.args.pkgs = import inputs.nixpkgs {
-            inherit system;
-            overlays = [
-              inputs.zig-overlay.overlays.default
-            ];
-            config = { };
-          };
-
-          packages = {
-            default = callPackage ./nix/package.nix {
-              zig = zigpkgs.master.overrideAttrs (
-                f: p: {
-                  inherit (zig_0_13) meta;
-
-                  passthru.hook = callPackage "${inputs.nixpkgs}/pkgs/development/compilers/zig/hook.nix" {
-                    zig = f.finalPackage;
-                  };
-                }
-              );
-            };
-            default_0_13 = callPackage ./nix/package.nix {
-              zig = zig_0_13;
-            };
-          };
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem(system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
         };
-    };
+      in
+      {
+        packages.default = pkgs.callPackage ./nix/package.nix {};
+        devShells.default = pkgs.mkShell {
+          buildInputs = [
+            pkgs.zig
+            pkgs.zls
+          ];
+        };
+      }
+    );
 }
